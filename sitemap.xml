@@ -1,0 +1,63 @@
+const express = require('express');
+const cors = require('cors');
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
+const { XMLBuilder } = require('fast-xml-parser');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 5000;
+
+async function crawlWebsite(url) {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'load', timeout: 0 });
+
+    const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('a'))
+            .map(a => a.href)
+            .filter(href => href.startsWith(window.location.origin));
+    });
+
+    await browser.close();
+    return [...new Set(links)];
+}
+
+function generateSitemap(url, links) {
+    const sitemapObj = {
+        urlset: {
+            url: [{ loc: url }].concat(links.map(link => ({ loc: link })))
+        }
+    };
+
+    const builder = new XMLBuilder({ format: true });
+    return builder.build(sitemapObj);
+}
+
+app.post('/generate-sitemap', async (req, res) => {
+    const { websiteUrl } = req.body;
+    if (!websiteUrl) return res.status(400).json({ error: 'URL is required' });
+
+    try {
+        const links = await crawlWebsite(websiteUrl);
+        const sitemapXml = generateSitemap(websiteUrl, links);
+        const filePath = path.join(__dirname, 'sitemap.xml');
+        fs.writeFileSync(filePath, sitemapXml);
+
+        res.json({ message: 'Sitemap generated successfully', downloadLink: `http://localhost:${PORT}/download-sitemap` });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate sitemap', details: error.message });
+    }
+});
+
+app.get('/download-sitemap', (req, res) => {
+    const filePath = path.join(__dirname, 'sitemap.xml');
+    res.download(filePath, 'sitemap.xml');
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
