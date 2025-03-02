@@ -1,0 +1,59 @@
+import { useState } from "react";
+import axios from "axios";
+
+export default function SitemapGenerator() {
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [downloadLink, setDownloadLink] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const generateSitemap = async () => {
+    setLoading(true);
+    setError("");
+    setDownloadLink("");
+
+    try {
+      const response = await axios.post("https://poki-games-online.github.io/site-map/api/generate-sitemap", { websiteUrl });
+      setDownloadLink(response.data.downloadLink);
+    } catch (err) {
+      setError("Failed to generate sitemap. Please try again.");
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+      <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md text-center">
+        <h1 className="text-2xl font-bold mb-4">Sitemap Generator</h1>
+        <input
+          type="text"
+          placeholder="Enter website URL"
+          className="w-full p-2 border rounded mb-4"
+          value={websiteUrl}
+          onChange={(e) => setWebsiteUrl(e.target.value)}
+        />
+        <button
+          onClick={generateSitemap}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+          disabled={loading || !websiteUrl}
+        >
+          {loading ? "Generating..." : "Generate Sitemap"}
+        </button>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+        {downloadLink && (
+          <a
+            href={downloadLink}
+            className="block mt-4 text-blue-600 underline"
+            download
+          >
+            Download Sitemap
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Ensure axios connects to the backend
+axios.defaults.baseURL = "https://poki-games-online.github.io/site-map/api";
